@@ -184,52 +184,62 @@ def main():
         print("No <joint> found in this URDF.")
         sys.exit(1)
 
+    changed: Dict[str, float] = {}
     print_joint_table(joints)
 
-    sel = ask("Select joint by #, name, comma-separated, or 'all': ")
-    if not sel:
-        print("No selection provided. Exiting.")
-        sys.exit(1)
+    while True:
+        sel = ask("Select joint by #, name, comma-separated, or 'all': ")
+        if not sel:
+            print("No selection provided. Exiting.")
+            sys.exit(1)
 
-    sel = sel.strip()
-    selected: List[ET.Element] = []
+        sel = sel.strip()
+        selected: List[ET.Element] = []
 
-    if sel.lower() == "all":
-        selected = joints[:]
-    else:
-        tokens = [t.strip() for t in sel.split(",") if t.strip()]
-        for t in tokens:
-            if t.isdigit():
-                idx = int(t)
-                if idx < 1 or idx > len(joints):
-                    print(f"Invalid joint index: {t}")
-                    sys.exit(1)
-                selected.append(joints[idx - 1])
-            else:
-                match = None
-                for j in joints:
-                    if j.get("name") == t:
-                        match = j
-                        break
-                if match is None:
-                    print(f"Joint name not found: {t}")
-                    sys.exit(1)
-                selected.append(match)
+        if sel.lower() == "all":
+            selected = joints[:]
+        else:
+            tokens = [t.strip() for t in sel.split(",") if t.strip()]
+            for t in tokens:
+                if t.isdigit():
+                    idx = int(t)
+                    if idx < 1 or idx > len(joints):
+                        print(f"Invalid joint index: {t}")
+                        sys.exit(1)
+                    selected.append(joints[idx - 1])
+                else:
+                    match = None
+                    for j in joints:
+                        if j.get("name") == t:
+                            match = j
+                            break
+                    if match is None:
+                        print(f"Joint name not found: {t}")
+                        sys.exit(1)
+                    selected.append(match)
 
-    shift_limits = ask("Shift limits too? (y/N): ").lower() in ("y", "yes")
+        shift_limits = ask("Shift limits too? (y/N): ").lower() in ("y", "yes")
 
-    changed: Dict[str, float] = {}
-    for j in selected:
-        name = j.get("name", "(no-name)")
-        while True:
-            offset_str = ask(f"Offset degrees for joint '{name}': ")
-            try:
-                offset_deg = float(offset_str)
-                break
-            except ValueError:
-                print("Please enter a valid number.")
-        apply_zero_offset_to_joint(j, offset_deg, shift_limits=shift_limits)
-        changed[name] = offset_deg
+        for idx, j in enumerate(selected):
+            name = j.get("name", "(no-name)")
+            while True:
+                offset_str = ask(f"Offset degrees for joint '{name}': ")
+                try:
+                    offset_deg = float(offset_str)
+                    break
+                except ValueError:
+                    print("Please enter a valid number.")
+            apply_zero_offset_to_joint(j, offset_deg, shift_limits=shift_limits)
+            changed[name] = offset_deg
+
+            if idx < len(selected) - 1:
+                cont = ask("Continue to next joint? (Y/n): ").lower()
+                if cont in ("n", "no"):
+                    break
+
+        more = ask("Modify more joints? (y/N): ").lower()
+        if more not in ("y", "yes"):
+            break
 
     out_default = default_output_path(urdf_path)
     out_str = ask(f"Output path [default: {out_default}]: ")
